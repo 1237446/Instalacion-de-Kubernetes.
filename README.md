@@ -82,7 +82,7 @@ cilium status --wait
 Ahora que hemos completado la instalacion de cilium, habilitaremos la exposicion de servicos con Layer2 para el Balanceador de carga
 
 Definiremos las IPs a usar, creando el manifiesto **ip-pool.yaml** y lo aplicamos
-```
+```yaml
 apiVersion: cilium.io/v2alpha1
 kind: CiliumLoadBalancerIPPool
 metadata:
@@ -100,7 +100,7 @@ kubectl apply -f ip-pool.yaml
 ```
 
 Crearemos una Política de Anuncio Layer2, creando el manifiesto **l2-policy.yaml** y lo aplicamos
-```
+```yaml
 apiVersion: cilium.io/v2alpha1
 kind: CiliumL2AnnouncementPolicy
 metadata:
@@ -118,7 +118,7 @@ kubectl apply -f l2-policy.yaml
 ```
 
 Verificaremos que el funcionamiento, ejecutando el manifiesto test.yaml para probar el correcto funcionamiento 
-```
+```yaml
 apiVersion: v1
 kind: Service
 metadata:
