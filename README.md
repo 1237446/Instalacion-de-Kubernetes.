@@ -8,7 +8,7 @@ helm repo update
 ```
 Creamos el manifiesto yaml usando helm
 ```
-helm template cilium cilium/cilium \
+helm install cilium cilium/cilium \
   --namespace kube-system \
   --set kubeProxyReplacement=true \
   --set l2announcements.enabled=true \
@@ -16,7 +16,7 @@ helm template cilium cilium/cilium \
   --set l2announcements.leaseRenewDeadline=5s \
   --set l2announcements.leaseRetryPeriod=1s \
   --set ipam.mode=kubernetes \
-  --set operator.replicas=2 > cilium.yaml
+  --set operator.replicas=2
 ```
 > [!NOTE]
 > **--set kubeProxyReplacement=true:** Indica a Cilium que reemplace completamente la funcionalidad de kube-proxy. Esto es fundamental para que Cilium pueda manejar el balanceo de carga L2 y las IPs de tipo LoadBalancer.
@@ -27,14 +27,37 @@ helm template cilium cilium/cilium \
 > [!NOTE]
 > **--set ipam.mode=kubernetes:** Asegura que Cilium use el controlador de IPAM de Kubernetes para la asignación de IPs a los Pods.
 
-Una vez generado el manifiesto, lo ejecutamos 
+Verificamos el estado de cilium
 ```
-kubectl apply -f cilium.yaml
+kubectl get pods -n kube-system -l k8s-app=cilium
+```
+```
+NAMESPACE     NAME                               READY   STATUS    RESTARTS      AGE
+kube-system   cilium-envoy-5fwdq                 1/1     Running   0             9m34s
+kube-system   cilium-envoy-74bxq                 1/1     Running   0             9m34s
+kube-system   cilium-envoy-tgckc                 1/1     Running   0             9m34s
+kube-system   cilium-mhd72                       1/1     Running   0             9m34s
+kube-system   cilium-ngl2m                       1/1     Running   0             9m34s
+kube-system   cilium-operator-686959b66d-6t86c   1/1     Running   0             9m33s
+kube-system   cilium-operator-686959b66d-bmvgx   1/1     Running   0             9m33s
+kube-system   cilium-qvcgj                       1/1     Running   0             9m34s
+kube-system   coredns-674b8bbfcf-7q6mp           1/1     Running   0             16m
+kube-system   coredns-674b8bbfcf-d4tlf           1/1     Running   0             16m
+kube-system   etcd-node-01                       1/1     Running   1             16m
+kube-system   kube-apiserver-node-01             1/1     Running   2             16m
+kube-system   kube-controller-manager-node-01    1/1     Running   7 (14m ago)   16m
+kube-system   kube-proxy-6xjdn                   1/1     Running   0             16m
+kube-system   kube-proxy-lmb69                   1/1     Running   0             16m
+kube-system   kube-proxy-qlzvh                   1/1     Running   0             16m
+kube-system   kube-scheduler-node-01             1/1     Running   7 (14m ago)   16m
 ```
 
 Ahora eliminamos los pods de kube-proxy, para que cilium lo pueda reemplazar
 > [!CAUTION]
-> Ten en cuenta que la eliminación de kube-proxy romperá las conexiones de servicio existentes. El tráfico relacionado con los servicios se detendrá hasta que la funcionalidad de reemplazo de Cilium esté completamente instalada y operativa. Ten un plan de reversión en caso de que algo salga mal. 
+> Ten en cuenta que la eliminación de kube-proxy romperá las conexiones de servicio existentes. El tráfico relacionado con los servicios se detendrá hasta que la funcionalidad de reemplazo de Cilium esté completamente instalada y operativa. Ten un plan de reversión en caso de que algo salga mal.
+
+> [!CAUTION]
+> Antes de elimianar kube-proxy asegurate que todos los pods de cilium esten en **Runing**
 ```
 kubectl delete daemonset -n kube-system kube-proxy
 ```
@@ -77,7 +100,28 @@ Ahora verificaremos la instalacion de Cilium
 ```
 cilium status --wait
 ```
+```
+    /¯¯\
+ /¯¯\__/¯¯\    Cilium:             OK
+ \__/¯¯\__/    Operator:           OK
+ /¯¯\__/¯¯\    Envoy DaemonSet:    OK
+ \__/¯¯\__/    Hubble Relay:       disabled
+    \__/       ClusterMesh:        disabled
 
+DaemonSet              cilium                   Desired: 3, Ready: 3/3, Available: 3/3
+DaemonSet              cilium-envoy             Desired: 3, Ready: 3/3, Available: 3/3
+Deployment             cilium-operator          Desired: 2, Ready: 2/2, Available: 2/2
+Containers:            cilium                   Running: 3
+                       cilium-envoy             Running: 3
+                       cilium-operator          Running: 2
+                       clustermesh-apiserver
+                       hubble-relay
+Cluster Pods:          2/2 managed by Cilium
+Helm chart version:    1.17.5
+Image versions         cilium             quay.io/cilium/cilium:v1.17.5@sha256:baf8541723ee0b72d6c489c741c81a6fdc5228940d66cb76ef5ea2ce3c639ea6: 3
+                       cilium-envoy       quay.io/cilium/cilium-envoy:v1.32.6-1749271279-0864395884b263913eac200ee2048fd985f8e626@sha256:9f69e290a7ea3d4edf9192acd81694089af048ae0d8a67fb63bd62dc1d72203e: 3
+                       cilium-operator    quay.io/cilium/operator-generic:v1.17.5@sha256:f954c97eeb1b47ed67d08cc8fb4108fb829f869373cbb3e698a7f8ef1085b09e: 2
+```
 ## Configuracion de cilium
 Ahora que hemos completado la instalacion de cilium, habilitaremos la exposicion de servicos con Layer2 para el Balanceador de carga
 
@@ -106,9 +150,9 @@ kind: CiliumL2AnnouncementPolicy
 metadata:
   name: default-l2-policy
 spec:
-  loadBalancerIPs: true 
-  externalIPs: true    
-  interfaces:        
+  loadBalancerIPs: true
+  externalIPs: true
+  interfaces:
     - enp0s3 # REEMPLAZA con el nombre de tu interfaz de red principal
   nodeSelector: {} # Puedes usar un selector para aplicar esta política a nodos específicos
   serviceSelector: {} # Puedes usar un selector para aplicar esta política a servicios específicos
