@@ -1,0 +1,8 @@
+apiVersion: cilium.io/v2alpha1
+kind: CiliumLoadBalancerIPPool
+metadata:
+  name: my-l2-ip-pool
+spec:
+  blocks:
+    - cidr: "192.168.1.200/29" # REEMPLAZA con un rango de IPs DISPONIBLES en tu red local
+  serviceSelector: {} # Deja vacío para aplicar a todos los servicios por defecto, o usa un selector si es necesario
