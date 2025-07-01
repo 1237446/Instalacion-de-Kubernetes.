@@ -27,7 +27,7 @@ helm install cilium cilium/cilium \
 > [!NOTE]
 > **--set ipam.mode=kubernetes:** Asegura que Cilium use el controlador de IPAM de Kubernetes para la asignación de IPs a los Pods.
 
-Verificamos el estado de de los pods de cilium
+Verificamos el estado de de los pods de cilium, esperemanos a que todos los pods esten en **Runnig**
 ```
 kubectl get pods -n kube-system -l k8s-app=cilium
 ```
@@ -57,7 +57,7 @@ Ahora eliminamos los pods de kube-proxy, para que cilium lo pueda reemplazar
 > Ten en cuenta que la eliminación de kube-proxy romperá las conexiones de servicio existentes. El tráfico relacionado con los servicios se detendrá hasta que la funcionalidad de reemplazo de Cilium esté completamente instalada y operativa. Ten un plan de reversión en caso de que algo salga mal.
 
 > [!CAUTION]
-> Antes de elimianar kube-proxy asegurate que todos los pods de cilium esten en **Runing**
+> Antes de elimianar kube-proxy asegurate que todos los pods de cilium esten en **Running**
 ```
 kubectl delete daemonset -n kube-system kube-proxy
 ```
