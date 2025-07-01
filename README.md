@@ -1,12 +1,12 @@
 # cilium
 Usaremos la manera mas recomendada para instalar cilum, la cual es usando helm, el gestor de paquetes de kubernetes ademas habilitaremos el balanceo de carga layer2 para soluciones om-premise
 ## Instalacion de cilium en kubernetes
-Añadimos el Repositorio de Helm de Cilium
+Añadimos el Repositorio de Helm, para poder instalar Cilium 
 ```
 helm repo add cilium https://helm.cilium.io/
 helm repo update
 ```
-Creamos el manifiesto yaml usando helm
+Instalamos cilium usando helm, ademas de añadir los parametros para habilitar la publicacion en Layer2
 ```
 helm install cilium cilium/cilium \
   --namespace kube-system \
@@ -27,7 +27,7 @@ helm install cilium cilium/cilium \
 > [!NOTE]
 > **--set ipam.mode=kubernetes:** Asegura que Cilium use el controlador de IPAM de Kubernetes para la asignación de IPs a los Pods.
 
-Verificamos el estado de cilium
+Verificamos el estado de de los pods de cilium
 ```
 kubectl get pods -n kube-system -l k8s-app=cilium
 ```
@@ -53,7 +53,7 @@ kube-system   kube-scheduler-node-01             1/1     Running   7 (14m ago)  
 ```
 
 Ahora eliminamos los pods de kube-proxy, para que cilium lo pueda reemplazar
-> [!CAUTION]
+> [!WARNING]
 > Ten en cuenta que la eliminación de kube-proxy romperá las conexiones de servicio existentes. El tráfico relacionado con los servicios se detendrá hasta que la funcionalidad de reemplazo de Cilium esté completamente instalada y operativa. Ten un plan de reversión en caso de que algo salga mal.
 
 > [!CAUTION]
@@ -62,13 +62,8 @@ Ahora eliminamos los pods de kube-proxy, para que cilium lo pueda reemplazar
 kubectl delete daemonset -n kube-system kube-proxy
 ```
 
-Verificamos el estado de cilium
-```
-kubectl get pods -n kube-system -l k8s-app=cilium
-```
-
 ### Cilium CLI
-usaremos la manera mas facil, la cual es descargando el binario directamente desde el releases de GitHub.
+Cilium ya esta instalado pero añadiremos su recurso CLI para poder verificar el estado de los pods, descargamos el binario directamente desde el releases de GitHub.
 > [!TIP]
 > Define la versión de Cilium que estás usando o la más reciente si no estás seguro Puedes encontrar la última versión en https://github.com/cilium/cilium-cli/releases
 ```
@@ -77,7 +72,7 @@ CILIUM_CLI_VERSION=$(curl -s https://api.github.com/repos/cilium/cilium-cli/rele
 curl -L --remote-name-all https://github.com/cilium/cilium-cli/releases/download/${CILIUM_CLI_VERSION}/cilium-linux-amd64.tar.gz{,.sha256sum}
 ```
 
-verficamos la integridad del archivo
+verficamos la integridad del archivo descargado
 ```
 sha256sum --check cilium-linux-amd64.tar.gz.sha256sum
 ```
@@ -92,11 +87,11 @@ Movemos el binario al directorio **/usr/local/bin**
 sudo mv cilium /usr/local/bin
 ```
 
-Verificamos la instalacion
+Verificamos la instalacion del CLI
 ```
 cilium version
 ```
-Ahora verificaremos la instalacion de Cilium
+Ahora verificaremos el funcionamiento de Cilium
 ```
 cilium status --wait
 ```
