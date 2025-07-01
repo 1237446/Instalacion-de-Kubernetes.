@@ -196,3 +196,14 @@ spec:
 ```
 kubectl apply -f test.yaml
 ```
+```
+kubectl get svc
+```
+```
+NAME         TYPE           CLUSTER-IP       EXTERNAL-IP    PORT(S)        AGE
+clamav       ClusterIP      10.96.37.93      <none>         3310/TCP       16h
+kubernetes   ClusterIP      10.96.0.1        <none>         443/TCP        20h
+nginx        LoadBalancer   10.106.163.196   172.16.8.180   80:32160/TCP   7m26s
+postgresql   ClusterIP      10.104.138.185   <none>         5432/TCP       16h
+redis        ClusterIP      10.100.66.147    <none>         6379/TCP       16h
+```
