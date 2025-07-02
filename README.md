@@ -1,6 +1,8 @@
-# cilium
+# Instalacion de cilium en kubernetes
 Usaremos la manera mas recomendada para instalar cilum, la cual es usando helm, el gestor de paquetes de kubernetes ademas habilitaremos el balanceo de carga layer2 para soluciones om-premise
-## Instalacion de cilium en kubernetes
+
+![guia](/imagenes/imagen-0.png)
+
 Añadimos el Repositorio de Helm, para poder instalar Cilium 
 ```
 helm repo add cilium https://helm.cilium.io/
@@ -207,3 +209,23 @@ nginx        LoadBalancer   10.106.163.196   172.16.8.180   80:32160/TCP   7m26s
 postgresql   ClusterIP      10.104.138.185   <none>         5432/TCP       16h
 redis        ClusterIP      10.100.66.147    <none>         6379/TCP       16h
 ```
+## Hubble
+Es una la poderosa herramienta de observabilidad para monitorear y entender lo que sucede en tu red de Kubernetes impulsada por Cilium
+
+Su instalacion es sencilla debido a que ya contamos con **cilium cli**
+```
+cilium hubble enable --ui
+```
+Una vez habilitado ingresamos a la interfaz web
+```
+cilium hubble ui
+```
+Para poder acceder tendremos que crear un pequeño tunel con ssh
+```
+sudo ssh -L 80:localhost:12000 <user>@<host>
+```
+ingresamos desde nuestro navegador al local hosts y seleccionamos que namespaces observaremos
+
+![guia](/imagenes/imagen-1.png)
+
+![guia](/imagenes/imagen-2.png)
