@@ -1,4 +1,13 @@
-# Instalacion de cilium en kubernetes
+# Instalacion de Kubernetes en Ubbuntu server 24.04
+> [!NOTE]
+> Esta presente guia es una adaptacion de la guia echa por [Pabpereza](https://pabpereza.dev/docs/cursos/kubernetes/instalacion_de_kubernetes_cluster_completo_ubuntu_server_con_kubeadm/), la guia original es de su propiedad
+
+Kubernetes, al igual que pasa con linux no tiene una manera unica de instalarse, esta dependera de la distribucion que elijamos. En esta guia usaremos K8s que es la distribucion "oficial" de kubernetes.
+
+Para todas las instalaciones estos son los requisitos mínimos y los recomendados para un cluster de Kubernetes:
+
+![guia](/imagenes/imagen-0.png)
+
 Usaremos la manera mas recomendada para instalar cilum, la cual es usando helm, el gestor de paquetes de kubernetes ademas habilitaremos el balanceo de carga layer2 para soluciones om-premise
 
 ![guia](/imagenes/imagen-0.png)
