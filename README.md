@@ -1,4 +1,4 @@
-# Instalacion de Kubernetes en Ubbuntu server 24.04
+# Instalacion de Kubernetes v1.33 en Ubbuntu server 24.04
 > [!NOTE]
 > Esta presente guia es una adaptacion de la guia echa por [Pabpereza](https://pabpereza.dev/docs/cursos/kubernetes/instalacion_de_kubernetes_cluster_completo_ubuntu_server_con_kubeadm/), la guia original es de su propiedad
 
@@ -6,41 +6,200 @@ Kubernetes, al igual que pasa con linux no tiene una manera unica de instalarse,
 
 Para todas las instalaciones estos son los requisitos mínimos y los recomendados para un cluster de Kubernetes:
 
-![guia](/imagenes/imagen-0.png)
+![guia](/imagenes/picture-0.png)
 
-Usaremos la manera mas recomendada para instalar cilum, la cual es usando helm, el gestor de paquetes de kubernetes ademas habilitaremos el balanceo de carga layer2 para soluciones om-premise
-
-![guia](/imagenes/imagen-0.png)
-
-Añadimos el Repositorio de Helm, para poder instalar Cilium 
-```
-helm repo add cilium https://helm.cilium.io/
-helm repo update
-```
-Instalamos cilium usando helm, ademas de añadir los parametros para habilitar la publicacion en Layer2
-```
-helm install cilium cilium/cilium \
-  --namespace kube-system \
-  --set kubeProxyReplacement=true \
-  --set l2announcements.enabled=true \
-  --set l2announcements.leaseDuration=10s \
-  --set l2announcements.leaseRenewDeadline=5s \
-  --set l2announcements.leaseRetryPeriod=1s \
-  --set ipam.mode=kubernetes \
-  --set operator.replicas=2
-```
+## Nodo maestro y workers
 > [!NOTE]
-> **--set kubeProxyReplacement=true:** Indica a Cilium que reemplace completamente la funcionalidad de kube-proxy. Esto es fundamental para que Cilium pueda manejar el balanceo de carga L2 y las IPs de tipo LoadBalancer.
-
-> [!NOTE]
-> **--set l2announcements.enabled=true:** Habilita la característica de anuncios L2, que es la base >para la exposición de servicios.
-
-> [!NOTE]
-> **--set ipam.mode=kubernetes:** Asegura que Cilium use el controlador de IPAM de Kubernetes para la asignación de IPs a los Pods.
-
-Verificamos el estado de de los pods de cilium, esperemanos a que todos los pods esten en **Runnig**
+> los comandos se han ejecutado con el usuario root.
+Actualizar paquetería e instalar requisitos previos:
 ```
-kubectl get pods -n kube-system -l k8s-app=cilium
+apt update && apt upgrade -y
+apt install curl apt-transport-https git wget software-properties-common lsb-release ca-certificates socat -y
+```
+
+Desactivar swap:
+```
+swapoff -a
+sed -i '/swap/s/^\(.*\)$/#\1/g' /etc/fstab # Auto comenta la línea de swap en fstab
+```
+
+Cargar módulos necesarios del kernel y cargar configuración en sysctl:
+```
+modprobe overlay
+modprobe br_netfilter
+cat << EOF | tee /etc/sysctl.d/kubernetes.conf
+net.bridge.bridge-nf-call-ip6tables = 1
+net.bridge.bridge-nf-call-iptables = 1
+net.ipv4.ip_forward = 1
+EOF
+```
+
+Aplicar configuración de sysctl y comprobar que se ha aplicado correctamente:
+```
+sysctl --system
+```
+
+Instalar las claves gpg de Docker para instalar containerd:
+```
+mkdir -p /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+| sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+echo \
+"deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+https://download.docker.com/linux/ubuntu \
+$(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+```
+
+Instalar containerd y configurar el daemon para que use cgroups de systemd:
+```
+apt-get update && apt-get install containerd.io -y
+containerd config default | tee /etc/containerd/config.toml
+sed -e's/SystemdCgroup = false/SystemdCgroup = true/g' -i /etc/containerd/config.toml
+systemctl restart containerd
+```
+
+Instalar claves gpg de Kubernetes y añadir el repositorio:
+```
+mkdir -p -m 755 /etc/apt/keyrings
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.33/deb/Release.key \
+| sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+```
+
+Añadir el repositorio de Kubernetes 1.30 (puedes cambiar la versión modificando las URLs):
+```
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] \
+https://pkgs.k8s.io/core:/stable:/v1.33/deb/ /" \
+| sudo tee /etc/apt/sources.list.d/kubernetes.list
+apt-get update
+```
+
+Instalar kubeadm, kubelet y kubectl:
+```
+apt-get install -y kubeadm kubelet kubectl
+apt-mark hold kubelet kubeadm kubectl
+```
+
+Buscamos las ips de los nodos master y worker IP y la añadimos al fichero /etc/hosts de todos los nodos
+> [!TIP]
+> Puedes obtener tu ip con el comando "ip a" o "hostname -i."
+```
+echo "<IP> <nombre del nodo>" >> /etc/hosts
+```
+verificamos la adicion de las ips
+```
+cat /etc/hosts
+```
+```
+node-master-0  192.168.1.200
+node-worker-0  192.168.1.201
+node-worker-1  192.168.1.202
+```
+
+## Nodo Master
+Iniciar el cluster con kubeadm (importante cambiar el rango de IPs para pods por uno que no esté en uso en tu red, evitar también el rango 10.x.x.x ya que es un rango reservado para redes privadas). Por último, añadimos el nombre del nodo maestro (recuerda usar el de antes) y el puerto 6443:
+```
+kubeadm init --pod-network-cidr=<rango de IPs para pods> --control-plane-endpoint=<Nombre añañadido en el /etc/hosts>:6443
+```
+> [!TIP]
+> kubeadm init --pod-network-cidr=192.168.0.0/16 --control-plane-endpoint=node-master-0:6443 
+
+Configurar kubectl:
+> [!NOTE]
+> Apartir de este paso los comandos se han ejecutado con el usuario del sistema.
+```
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+```
+
+instalar autocompletado:
+> [!TIP]
+> Esto nos permitirá usar autocompletado en la terminal de bash y si tabulamos después de escribir kubectl nos mostrará las opciones disponibles.
+```
+sudo apt-get install bash-completion -y
+source <(kubectl completion bash)
+echo 'source <(kubectl completion bash)' >> ~/.bashrc # persistir autocompletado
+```
+
+Instalar Helm, necesario para instalar algunas aplicaciones en Kubernetes, incluido cilium (la CNI que vamos a instalar):
+```
+curl https://baltocdn.com/helm/signing.asc | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+sudo apt-get update
+sudo apt-get install helm -y
+```
+
+### Instalacion de CNI
+En este caso usaremos CILIUM debido a que se basa en una nueva tecnología del kernel de Linux llamada eBPF, que permite la integración dinámica de una potente lógica de visibilidad y control de seguridad dentro del propio Linux.
+
+> [!NOTE]
+> La instalacion de cilium es sacada de la guia [oficial](https://docs.cilium.io/en/stable/gettingstarted/k8s-install-default/)
+
+![guia](/imagenes/picture-1.png)
+
+```
+CILIUM_CLI_VERSION=$(curl -s https://raw.githubusercontent.com/cilium/cilium-cli/main/stable.txt)
+CLI_ARCH=amd64
+if [ "$(uname -m)" = "aarch64" ]; then CLI_ARCH=arm64; fi
+curl -L --fail --remote-name-all https://github.com/cilium/cilium-cli/releases/download/${CILIUM_CLI_VERSION}/cilium-linux-${CLI_ARCH}.tar.gz{,.sha256sum}
+sha256sum --check cilium-linux-${CLI_ARCH}.tar.gz.sha256sum
+sudo tar xzvfC cilium-linux-${CLI_ARCH}.tar.gz /usr/local/bin
+rm cilium-linux-${CLI_ARCH}.tar.gz{,.sha256sum}
+```
+```
+cilium install --versión 1.18.1
+```
+
+Si quieres que tu nodo maestro también sea un nodo worker (es decir, que ejecute pods), puedes hacerlo con el siguiente comando:
+> [!WARNING]
+> Esta es una opcion pero no es recomendado
+```
+kubectl taint nodes --all  node-role.kubernetes.io/control-plane-
+```
+
+Podríamos reactivar la restricción (taint) de que el nodo maestro no ejecute pods con el comando:
+```
+kubectl taint nodes --all node-role.kubernetes.io/control-plane:NoSchedule
+```
+
+## Nodo worker
+Obtenemos el token:
+```
+kubeadm token list
+```
+```
+TOKEN                     TTL         EXPIRES                USAGES                   DESCRIPTION                                                EXTRA GROUPS
+vm8owh.kajjwyp94tajsizs   1h          2025-08-24T01:52:35Z   authentication,signing   The default bootstrap token generated by 'kubeadm init'.   system:bootstrappers:kubeadm:default-node-token
+```
+> [!TIP]
+> Si hubiera expirado, se puede generar uno nuevo con **kubeadm token create**.
+
+El hash se puede obtener con el siguiente comando de openssl. Lo lanzamos en el nodo maestro:
+```
+openssl x509 -pubkey -in /etc/kubernetes/pki/ca.crt | openssl rsa -pubin -outform der 2>/dev/null | openssl dgst -sha256 -hex | sed 's/^.* //'
+```
+
+Unir el nodo worker al cluster con el comando que nos proporcionó kubeadm init en el nodo maestro:
+```
+kubeadm join <Nombre del nodo maestro>:6443 --token <token> --discovery-token-ca-cert-hash sha256:<hash>
+```
+
+Comprobar que el nodo worker se ha unido correctamente al cluster. Lanza el siguiente comando en el nodo maestro:
+```
+kubectl get nodes
+```
+> [!TIP]
+> Es posible que tarde un poco en estar listo
+```
+NAME            STATUS   ROLES           AGE   VERSION
+node-master-0   Ready    control-plane   15m   v1.33.4
+node-worker-0   Ready    <none>          15m   v1.33.4
+node-worker-1   Ready    <none>          15m   v1.33.4
+```
+
+Comprobamos el funcionamiento en general de los pods
+```
+kubectl get pods -n kube-system
 ```
 ```
 NAMESPACE     NAME                               READY   STATUS    RESTARTS      AGE
@@ -63,45 +222,6 @@ kube-system   kube-proxy-qlzvh                   1/1     Running   0            
 kube-system   kube-scheduler-node-01             1/1     Running   7 (14m ago)   16m
 ```
 
-Ahora eliminamos los pods de kube-proxy, para que cilium lo pueda reemplazar
-> [!WARNING]
-> Ten en cuenta que la eliminación de kube-proxy romperá las conexiones de servicio existentes. El tráfico relacionado con los servicios se detendrá hasta que la funcionalidad de reemplazo de Cilium esté completamente instalada y operativa. Ten un plan de reversión en caso de que algo salga mal.
-
-> [!CAUTION]
-> Antes de elimianar kube-proxy asegurate que todos los pods de cilium esten en **Running**
-```
-kubectl delete daemonset -n kube-system kube-proxy
-```
-
-### Cilium CLI
-Cilium ya esta instalado pero añadiremos su recurso CLI para poder verificar el estado de los pods, descargamos el binario directamente desde el releases de GitHub.
-> [!TIP]
-> Define la versión de Cilium que estás usando o la más reciente si no estás seguro Puedes encontrar la última versión en https://github.com/cilium/cilium-cli/releases
-```
-CILIUM_CLI_VERSION=$(curl -s https://api.github.com/repos/cilium/cilium-cli/releases/latest | grep -oP '"tag_name": "\K[^"]+')
-
-curl -L --remote-name-all https://github.com/cilium/cilium-cli/releases/download/${CILIUM_CLI_VERSION}/cilium-linux-amd64.tar.gz{,.sha256sum}
-```
-
-verficamos la integridad del archivo descargado
-```
-sha256sum --check cilium-linux-amd64.tar.gz.sha256sum
-```
-
-Extraemos el binario
-```
-tar xzvf cilium-linux-amd64.tar.gz
-```
-
-Movemos el binario al directorio **/usr/local/bin** 
-```
-sudo mv cilium /usr/local/bin
-```
-
-Verificamos la instalacion del CLI
-```
-cilium version
-```
 Ahora verificaremos el funcionamiento de Cilium
 ```
 cilium status --wait
@@ -128,7 +248,8 @@ Image versions         cilium             quay.io/cilium/cilium:v1.17.5@sha256:b
                        cilium-envoy       quay.io/cilium/cilium-envoy:v1.32.6-1749271279-0864395884b263913eac200ee2048fd985f8e626@sha256:9f69e290a7ea3d4edf9192acd81694089af048ae0d8a67fb63bd62dc1d72203e: 3
                        cilium-operator    quay.io/cilium/operator-generic:v1.17.5@sha256:f954c97eeb1b47ed67d08cc8fb4108fb829f869373cbb3e698a7f8ef1085b09e: 2
 ```
-## Configuracion de cilium
+
+## Configuracion de cilium (OPCIONAL) 
 Ahora que hemos completado la instalacion de cilium, habilitaremos la exposicion de servicos con Layer2 para el Balanceador de carga
 
 Definiremos las IPs a usar, creando el manifiesto **ip-pool.yaml** y lo aplicamos
@@ -141,16 +262,8 @@ spec:
   blocks:
     - cidr: "192.168.1.200/29" # REEMPLAZA con un rango de IPs DISPONIBLES en tu red local
   serviceSelector: {} # Deja vacío para aplicar a todos los servicios por defecto, o usa un selector si es necesario
-```
-> [!IMPORTANT]
-> Para definir el rango de IPs, se debe de usar el mismo metodo que se usa para crear subredes
 
-```
-kubectl apply -f ip-pool.yaml
-```
-
-Crearemos una Política de Anuncio Layer2, creando el manifiesto **l2-policy.yaml** y lo aplicamos
-```yaml
+---
 apiVersion: cilium.io/v2alpha1
 kind: CiliumL2AnnouncementPolicy
 metadata:
@@ -164,7 +277,7 @@ spec:
   serviceSelector: {} # Puedes usar un selector para aplicar esta política a servicios específicos
 ```
 ```
-kubectl apply -f l2-policy.yaml
+kubectl apply -f ip-pool.yaml
 ```
 
 Verificaremos que el funcionamiento, ejecutando el manifiesto test.yaml para probar el correcto funcionamiento 
@@ -212,12 +325,10 @@ kubectl get svc
 ```
 ```
 NAME         TYPE           CLUSTER-IP       EXTERNAL-IP    PORT(S)        AGE
-clamav       ClusterIP      10.96.37.93      <none>         3310/TCP       16h
-kubernetes   ClusterIP      10.96.0.1        <none>         443/TCP        20h
+kubernetes   ClusterIP      10.96.0.1        <none>         443/TCP        20m
 nginx        LoadBalancer   10.106.163.196   172.16.8.180   80:32160/TCP   7m26s
-postgresql   ClusterIP      10.104.138.185   <none>         5432/TCP       16h
-redis        ClusterIP      10.100.66.147    <none>         6379/TCP       16h
 ```
+
 ## Hubble
 Es una la poderosa herramienta de observabilidad para monitorear y entender lo que sucede en tu red de Kubernetes impulsada por Cilium
 
@@ -235,6 +346,6 @@ sudo ssh -L 80:localhost:12000 <user>@<host>
 ```
 ingresamos desde nuestro navegador al local hosts y seleccionamos que namespaces observaremos
 
-![guia](/imagenes/imagen-1.png)
+![guia](/imagenes/picture-2.png)
 
-![guia](/imagenes/imagen-2.png)
+![guia](/imagenes/picture-3.png)
