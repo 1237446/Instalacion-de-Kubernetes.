@@ -120,7 +120,7 @@ instalar autocompletado:
 ```
 sudo apt-get install bash-completion -y
 source <(kubectl completion bash)
-echo 'source <(kubectl completion bash)' >> ~/.bashrc # persistir autocompletado
+echo 'source <(kubectl completion bash)' >> ~/.bashrc
 ```
 
 Instalar Helm, necesario para instalar algunas aplicaciones en Kubernetes, incluido cilium (la CNI que vamos a instalar):
@@ -149,7 +149,7 @@ sudo tar xzvfC cilium-linux-${CLI_ARCH}.tar.gz /usr/local/bin
 rm cilium-linux-${CLI_ARCH}.tar.gz{,.sha256sum}
 ```
 ```
-cilium install --versión 1.18.1
+cilium install --version 1.18.1
 ```
 
 Si quieres que tu nodo maestro también sea un nodo worker (es decir, que ejecute pods), puedes hacerlo con el siguiente comando:
