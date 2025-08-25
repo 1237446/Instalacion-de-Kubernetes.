@@ -92,9 +92,9 @@ verificamos la adicion de las ips
 cat /etc/hosts
 ```
 ```
-node-master-0  192.168.1.200
-node-worker-0  192.168.1.201
-node-worker-1  192.168.1.202
+192.168.1.200    node-master-0
+192.168.1.201    node-worker-0
+192.168.1.202    node-worker-1 
 ```
 
 ## Nodo Master
