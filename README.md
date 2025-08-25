@@ -21,7 +21,7 @@ apt install curl apt-transport-https git wget software-properties-common lsb-rel
 Desactivar swap:
 ```
 swapoff -a
-sed -i '/swap/s/^\(.*\)$/#\1/g' /etc/fstab # Auto comenta la línea de swap en fstab
+sed -i '/swap/s/^\(.*\)$/#\1/g' /etc/fstab
 ```
 
 Cargar módulos necesarios del kernel y cargar configuración en sysctl:
@@ -56,6 +56,7 @@ Instalar containerd y configurar el daemon para que use cgroups de systemd:
 apt-get update && apt-get install containerd.io -y
 containerd config default | tee /etc/containerd/config.toml
 sed -e's/SystemdCgroup = false/SystemdCgroup = true/g' -i /etc/containerd/config.toml
+sed -e 's|sandbox_image = "registry.k8s.io/pause:3.8"|sandbox_image = "registry.k8s.io/pause:3.10"|g' -i /etc/containerd/config.toml
 systemctl restart containerd
 ```
 
