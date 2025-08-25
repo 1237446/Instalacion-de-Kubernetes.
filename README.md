@@ -1,16 +1,17 @@
-# Instalacion de Kubernetes v1.33 en Ubbuntu server 24.04
+# Instalacion de Kubernetes v1.33 en Ubuntu server 24.04
 > [!NOTE]
 > Esta presente guia es una adaptacion de la guia echa por [Pabpereza](https://pabpereza.dev/docs/cursos/kubernetes/instalacion_de_kubernetes_cluster_completo_ubuntu_server_con_kubeadm/), la guia original es de su propiedad
 
-Kubernetes, al igual que pasa con linux no tiene una manera unica de instalarse, esta dependera de la distribucion que elijamos. En esta guia usaremos K8s que es la distribucion "oficial" de kubernetes.
+Kubernetes, al igual que pasa con Linux no tiene una manera única de instalarse, esta dependerá de la distribución que elijamos. En esta guía usaremos K8s que es la distribución "oficial" de kubernetes.
 
-Para todas las instalaciones estos son los requisitos mínimos y los recomendados para un cluster de Kubernetes:
+Para todas las instalaciones estos son los requisitos mínimos y los recomendados para un clúster de Kubernetes:
 
 ![guia](/imagenes/picture-0.png)
 
 ## Nodo maestro y workers
 > [!NOTE]
 > los comandos se han ejecutado con el usuario root.
+
 Actualizar paquetería e instalar requisitos previos:
 ```
 apt update && apt upgrade -y
